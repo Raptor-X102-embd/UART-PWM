@@ -1,0 +1,3 @@
+[submodule "rtl/axi"]
+	path = rtl/axi
+	url = git@github-second:Raptor-X102-embd/AMBA-AXI-4.git
