@@ -1,0 +1,51 @@
+# ============================================================================
+#  constraints.lpf  --  Lattice Preference File for iCESugar-Pro (ECP5)
+#  Device: LFE5U-25F-6BG256C
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 1.  CLOCK DEFINITIONS
+# ----------------------------------------------------------------------------
+
+# Primary 25 MHz oscillator input
+LOCATE COMP "clk" SITE "P6";
+FREQUENCY PORT "clk" 25.000 MHz;
+IOBUF PORT "clk" IO_TYPE=LVCMOS33;
+
+# ----------------------------------------------------------------------------
+# 2.  I/O PIN ASSIGNMENTS
+# ----------------------------------------------------------------------------
+
+# Reset button (active low)
+LOCATE COMP "rst_n" SITE "L14";
+IOBUF PORT "rst_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+
+# UART pins (connected to USB-CDC via iCELink)
+# A9 - UART TX from PC to FPGA (RX input of FPGA)
+LOCATE COMP "rx" SITE "A9";
+IOBUF PORT "rx" IO_TYPE=LVCMOS33;
+
+# B9 - UART TX from FPGA to PC (TX output of FPGA)
+LOCATE COMP "tx" SITE "B9";
+IOBUF PORT "tx" IO_TYPE=LVCMOS33;
+
+# PWM output (using on-board red LED for testing)
+LOCATE COMP "pwm_out" SITE "B11";
+IOBUF PORT "pwm_out" IO_TYPE=LVCMOS33;
+
+# ----------------------------------------------------------------------------
+# 3.  TIMING CONSTRAINTS
+# ----------------------------------------------------------------------------
+
+# Input delay for reset button (debounced)
+INPUTDELAY COMP "rst_n" 2.0 NS;
+
+# Output delay for PWM/LED
+OUTPUTDELAY COMP "pwm_out" 3.0 NS;
+
+# ----------------------------------------------------------------------------
+# 4.  EXCEPTION PATHS
+# ----------------------------------------------------------------------------
+
+# Asynchronous reset: disable setup/hold checks
+PATH "rst_n" -> "*.D" EXCEPT;

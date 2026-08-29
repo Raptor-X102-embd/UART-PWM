@@ -1,0 +1,23 @@
+# Read all source files with include path
+read_verilog -sv -I rtl/headers -I rtl/axi/headers -D YOSYS \
+    rtl/src/top.sv \
+    rtl/src/pwm_generator.sv \
+    rtl/src/pwm_regs.sv \
+    rtl/src/uart_axi_wrapper.sv \
+    rtl/uart/Verilog/source/UART_RX.v \
+    rtl/uart/Verilog/source/UART_TX.v
+
+# Elaborate the design with top module (name 'top')
+hierarchy -top top
+
+# Convert behavioural processes to RTL
+proc
+
+# Global optimizations
+opt
+
+# Technology mapping for ECP5 (LFE5U-25F)
+synth_ecp5 -top top -json build/top.json -abc9 -dff
+
+# Optional: write flattened netlist for inspection
+write_verilog -noattr build/synth_netlist.v
