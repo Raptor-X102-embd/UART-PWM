@@ -27,6 +27,8 @@ ALL_SRC  := $(filter-out %UART_To_Bus16.v %UART_To_Bus8.v, $(ALL_SRC))
 ALL_SRC  := $(filter-out %.svh,$(ALL_SRC))
 
 HDR_DIRS := rtl/axi/headers rtl/headers
+ALL_HDR  := $(foreach dir,$(HDR_DIRS),$(wildcard $(dir)/*.svh))
+
 INCDIRS  := $(addprefix -I, $(HDR_DIRS))
 
 TB       := tb/tb_top.sv
@@ -57,14 +59,16 @@ NEXTPNR_FLAGS += --textcfg $(CONFIG)
 all: bit
 
 synth: $(JSON)
-$(JSON): $(SYNTH_SCRIPT)
+$(JSON): $(SYNTH_SCRIPT) $(ALL_SRC) $(ALL_HDR)
 	@mkdir -p $(BUILD_DIR)
 	$(YOSYS) -s $(SYNTH_SCRIPT) > $(BUILD_DIR)/synth.log 2>&1
 	@echo "Synthesis completed. JSON written to $(JSON)"
 
 place: $(CONFIG)
 $(CONFIG): $(JSON) $(LPF)
-	$(NEXTPNR) $(NEXTPNR_FLAGS) 2>&1 | tee $(BUILD_DIR)/pnr.log
+	$(NEXTPNR) $(NEXTPNR_FLAGS) > $(BUILD_DIR)/pnr.log 2>&1 ; \
+	cat $(BUILD_DIR)/pnr.log ; \
+	exit $$?
 
 bit: $(BIT)
 $(BIT): $(CONFIG)
@@ -76,7 +80,7 @@ prog: $(BIT)
 sim: $(SIM_BIN)
 	./$(SIM_BIN)
 
-$(SIM_BIN): $(ALL_SRC) $(TB)
+$(SIM_BIN): $(ALL_SRC) $(TB) $(ALL_HDR)
 	@mkdir -p $(BUILD_DIR)
 	$(VERILATOR) $(VERILATOR_FLAGS) --top-module tb_top --Mdir $(BUILD_DIR) -o tb_top $(ALL_SRC) $(TB)
 

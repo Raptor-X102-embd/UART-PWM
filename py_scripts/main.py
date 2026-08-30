@@ -71,33 +71,23 @@ class PWMController:
             return None
 
     def send_command(self, cmd, value):
-        """Send command + 3 data bytes (big-endian) and wait for echo."""
-        if value < 0 or value > 0xFFFFFF:
-            print(f"Warning: value {value} truncated to 24 bits.")
-            value = value & 0xFFFFFF
-
-        data_h = (value >> 16) & 0xFF
-        data_m = (value >> 8) & 0xFF
-        data_l = value & 0xFF
-        packet = bytes([cmd, data_h, data_m, data_l])
-
+        value = value & 0xFFFFFF
+        packet = bytes([cmd, (value>>16)&0xFF, (value>>8)&0xFF, value&0xFF])
         self.ser.write(packet)
-        print(f"Sent: {packet.hex().upper()}")
-        time.sleep(0.1)  # даём время FPGA ответить
-        while self.ser.in_waiting:
+        # Ожидаем 4 байта эха
+        echo = []
+        for _ in range(4):
             b = self.ser.read(1)
-            print(f"Received: 0x{b[0]:02X} ({chr(b[0]) if 32 <= b[0] < 127 else '?'})")
-
-        # Ожидаем эхо (байт команды)
-        echo = self.read_byte(timeout=0.5)
-        if echo == cmd:
-            print(f"Echo OK: 0x{cmd:02X}")
+            if not b:
+                print("Timeout waiting for echo")
+                return False
+            echo.append(b[0])
+        expected = [cmd, (value>>16)&0xFF, (value>>8)&0xFF, value&0xFF]
+        if echo == expected:
+            print(f"Full echo OK: {''.join(f'{x:02X}' for x in echo)}")
             return True
         else:
-            if echo is not None:
-                print(f"Unexpected echo: 0x{echo:02X} (expected 0x{cmd:02X})")
-            else:
-                print("No echo received")
+            print(f"Echo mismatch: expected {expected}, got {echo}")
             return False
 
     def test_sweep(self, divider, steps=20, delay=0.2):
@@ -207,3 +197,4 @@ Examples:
 
 if __name__ == "__main__":
     main()
+

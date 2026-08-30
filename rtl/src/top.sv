@@ -4,13 +4,17 @@
 
 module top #(
     parameter CLK_FREQ_HZ = 25_000_000,
-    parameter UART_BAUD   = 10000,
+    parameter UART_BAUD   = 9600,
     parameter CLKS_PER_BIT = CLK_FREQ_HZ / UART_BAUD
 )(
     input  logic clk,
     input  logic rst_n,
     input  logic rx,
     output logic tx,
+    output logic [9:0] state_led,
+    output logic [2:0] wstate_led,
+    //output logic [3:0] rx_valid_led,
+    //output logic [3:0] tx_done_led,
     output logic pwm_out
 );
 
@@ -34,8 +38,10 @@ module top #(
     );
 
     // UART signals
-    logic rx_valid, tx_valid, tx_ready;
+    logic rx_valid, tx_valid;
     logic [7:0] rx_byte, tx_byte;
+    logic tx_active;
+    logic tx_done;
 
     UART_RX #(.CLKS_PER_BIT(CLKS_PER_BIT)) uart_rx (
         .i_Rst_L(rst_n),
@@ -50,73 +56,62 @@ module top #(
         .i_Clock(clk),
         .i_TX_DV(tx_valid),
         .i_TX_Byte(tx_byte),
-        .o_TX_Active(tx_ready),
+        .o_TX_Active(tx_active),
         .o_TX_Serial(tx),
-        .o_TX_Done()
+        .o_TX_Done(tx_done)
     );
+
+    //assign tx_ready = ~tx_active;
 
     // AXI write master (wrapper)
- //   uart_axi_wrapper #(
- //       .ADDR_WIDTH(ADDR_WIDTH),
- //       .DATA_WIDTH(DATA_WIDTH)
- //   ) u_wrapper (
- //       .clk(clk),
- //       .rst_n(rst_n),
- //       .rx_valid(rx_valid),
- //       .rx_byte(rx_byte),
- //       .tx_valid(tx_valid),
- //       .tx_byte(tx_byte),
- //       .tx_ready(tx_ready),
- //       // AXI signals
- //       .awaddr(bus.AWADDR),
- //       .awvalid(bus.AWVALID),
- //       .awready(bus.AWREADY),
- //       .wdata(bus.WDATA),
- //       .wvalid(bus.WVALID),
- //       .wready(bus.WREADY),
- //       .wstrb(bus.WSTRB),
- //       .bvalid(bus.BVALID),
- //       .bready(bus.BREADY)
- //   );
-
- reg tx_valid_reg;
-reg [7:0] tx_byte_reg;
-
-always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        tx_valid_reg <= 1'b0;
-        tx_byte_reg  <= 8'b0;
-    end else begin
-        tx_valid_reg <= 1'b0; // по умолчанию
-        if (rx_valid) begin
-            tx_valid_reg <= 1'b1;
-            tx_byte_reg  <= rx_byte;
-        end
-    end
-end
-
-assign tx_valid = tx_valid_reg;
-assign tx_byte  = tx_byte_reg;
-
-    // PWM registers (AXI-Lite slave)
-    logic [23:0] divider, duty;
-    pwm_regs #(
+    uart_axi_wrapper #(
         .ADDR_WIDTH(ADDR_WIDTH),
-        .DATA_WIDTH(DATA_WIDTH),
-        .ID_WIDTH(ID_WIDTH)
-    ) u_pwm_regs (
-        .bus(bus),
-        .divider_o(divider),
-        .duty_o(duty)
-    );
-
-    // PWM generator
-    pwm_generator #(.WIDTH(32)) u_pwm (
+        .DATA_WIDTH(DATA_WIDTH)
+    ) u_wrapper (
         .clk(clk),
         .rst_n(rst_n),
-        .divider_i(divider),
-        .duty_i(duty),
+        .rx_valid(rx_valid),
+        .rx_byte(rx_byte),
+        .tx_valid(tx_valid),
+        .tx_byte(tx_byte),
+        //.tx_ready(tx_ready),
+        .tx_done(tx_done),
+        // AXI
+        .awaddr(bus.AWADDR),
+        .awvalid(bus.AWVALID),
+        .awready(bus.AWREADY),
+        .wdata(bus.WDATA),
+        .wvalid(bus.WVALID),
+        .wready(bus.WREADY),
+        .wstrb(bus.WSTRB),
+        .bvalid(bus.BVALID),
+        .bready(bus.BREADY),
+        .state_led(state_led),
         .pwm_out(pwm_out)
+        //.rx_valid_led(rx_valid_led),
+        //.tx_done_led(tx_done_led)
     );
+
+    // PWM registers (AXI-Lite slave)
+//    logic [23:0] divider, duty;
+//    pwm_regs #(
+//        .ADDR_WIDTH(ADDR_WIDTH),
+//        .DATA_WIDTH(DATA_WIDTH),
+//        .ID_WIDTH(ID_WIDTH)
+//    ) u_pwm_regs (
+//        .bus(bus),
+//        .divider_o(divider),
+//        .duty_o(duty),
+//        .wstate_led(wstate_led)
+//    );
+
+   // // PWM generator
+   // pwm_generator #(.WIDTH(24)) u_pwm (
+   //     .clk(clk),
+   //     .rst_n(rst_n),
+   //     .divider_i(divider),
+   //     .duty_i(duty),
+   //     .pwm_out(pwm_out)
+   // );
 
 endmodule
