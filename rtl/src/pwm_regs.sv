@@ -11,6 +11,8 @@ module pwm_regs
     parameter DATA_WIDTH = 32,
     parameter ID_WIDTH   = 4
 ) (
+    input  logic clk,
+    input  logic rst_n,
     axi4_if.slave bus,
     output logic [23:0] divider_o,
     output logic [23:0] duty_o,
@@ -71,8 +73,8 @@ module pwm_regs
    //
     
     // Write to registers
-    always_ff @(posedge bus.ACLK or negedge bus.ARESETn) begin
-        if (!bus.ARESETn) begin
+     always_ff @(posedge bus.ACLK or negedge bus.ARESETn) begin
+        if (!bus.ARESETn) begin 
             divider_reg <= 24'd12_500_000; // ~1 Гц при 25 МГц
             duty_reg    <= 24'd6_250_000;  // 50% скважность
         end else if (bus.WVALID /*&& bus.WREADY*/) begin
@@ -83,8 +85,8 @@ module pwm_regs
                 W_DIV_REG:  divider_reg <= wdata[23:0];
                 W_DUTY_REG: duty_reg    <= wdata[23:0];
                 default: begin
-                    divider_reg <= 24'd0; 
-                    duty_reg    <= 24'd625000;  // 50% скважность
+                    divider_reg <= 24'd12500; 
+                    duty_reg    <= 24'd625;  // 50% скважность
                 end
             endcase
         end
@@ -113,19 +115,25 @@ module pwm_regs
     assign bus.RRESP   = DECERR;
     assign bus.RID     = '0;
 
+    // Write channel assignments (minimal default)
+assign bus.AWREADY = 1'b1;   // всегда готов принимать адрес (если мастер выставит AWVALID)
+assign bus.WREADY  = 1'b1;   // всегда готов принимать данные
+assign bus.BVALID  = 1'b0;   // не формируем ответ (или можно 1'b1, но тогда нужна логика)
+assign bus.BRESP   = OKAY;
+assign bus.BID     = '0;
   // assign wstate_led[0] = wstate == W_IDLE;
   // assign wstate_led[1] = bus.AWREADY;
   // assign wstate_led[2] = bus.WREADY;
-   always @(posedge bus.ACLK or negedge bus.ARESETn) begin
-        if (!bus.ARESETn) begin
-            wstate_led <= '0;
-        end else begin
-  //          if (wstate == W_IDLE) wstate_led[0]  <= 1'b1;
-           // if (wstate == W_DATA) wstate_led[1]  <= 1'b1;
-   //         if (wstate == W_RESP) wstate_led[2]  <= 1'b1;
-        end
-    end 
-
+//   always @(posedge bus.ACLK or negedge bus.ARESETn) begin
+//        if (!bus.ARESETn) begin
+//            wstate_led <= '0;
+//        end else begin
+//  //          if (wstate == W_IDLE) wstate_led[0]  <= 1'b1;
+//           // if (wstate == W_DATA) wstate_led[1]  <= 1'b1;
+//   //         if (wstate == W_RESP) wstate_led[2]  <= 1'b1;
+//        end
+//    end 
+//
     
 
 endmodule

@@ -86,32 +86,33 @@ module top #(
         .wstrb(bus.WSTRB),
         .bvalid(bus.BVALID),
         .bready(bus.BREADY),
-        .state_led(state_led),
-        .pwm_out(pwm_out)
+        .state_led(state_led)
         //.rx_valid_led(rx_valid_led),
         //.tx_done_led(tx_done_led)
     );
 
     // PWM registers (AXI-Lite slave)
-//    logic [23:0] divider, duty;
-//    pwm_regs #(
-//        .ADDR_WIDTH(ADDR_WIDTH),
-//        .DATA_WIDTH(DATA_WIDTH),
-//        .ID_WIDTH(ID_WIDTH)
-//    ) u_pwm_regs (
-//        .bus(bus),
-//        .divider_o(divider),
-//        .duty_o(duty),
-//        .wstate_led(wstate_led)
-//    );
+    logic [23:0] divider, duty;
+    pwm_regs #(
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .DATA_WIDTH(DATA_WIDTH),
+        .ID_WIDTH(ID_WIDTH)
+    ) u_pwm_regs (
+        .clk(clk),
+        .rst_n(rst_n),
+        .bus(bus),
+        .divider_o(divider),
+        .duty_o(duty),
+        .wstate_led(wstate_led)
+    );
 
-   // // PWM generator
-   // pwm_generator #(.WIDTH(24)) u_pwm (
-   //     .clk(clk),
-   //     .rst_n(rst_n),
-   //     .divider_i(divider),
-   //     .duty_i(duty),
-   //     .pwm_out(pwm_out)
-   // );
+    // PWM generator
+    pwm_generator #(.WIDTH(24)) u_pwm (
+        .clk(clk),
+        .rst_n(rst_n),
+        .divider_i(divider),
+        .duty_i(duty),
+        .pwm_out(pwm_out)
+    );
 
 endmodule

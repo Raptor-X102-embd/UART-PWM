@@ -22,12 +22,8 @@ module uart_axi_wrapper #(
     output logic [DATA_WIDTH/8-1:0] wstrb,
     input  logic                  bvalid,
     output logic                  bready,
-    output logic [9:0] state_led,
-    output logic pwm_out
+    output logic [9:0] state_led
 );
-
-    logic [23:0] divider_reg;
-    logic [23:0] duty_reg;
 
     typedef enum logic [4:0] {
         IDLE,
@@ -71,8 +67,6 @@ module uart_axi_wrapper #(
             bready <= 1'b0;
             tx_valid <= 1'b0;
             tx_byte <= '0;
-            divider_reg <= 24'd12_500_000; // ~1 Гц при 25 МГц
-            duty_reg    <= 24'd6_250_000;  // 50% скважность
         end else begin
             // Сброс импульсных сигналов по умолчанию
             awvalid <= 1'b0;
@@ -190,20 +184,6 @@ module uart_axi_wrapper #(
 
                 default: state <= IDLE;
             endcase
-            
-            if (wvalid) begin
-                case ((wdata[31:24]))
-                    // to be honest, here we need full logic with wstrb check, but
-                    // we always write wstrb <= 4'b0111, so it is an optimization
-                    // :)
-                    W_DIV_REG:  divider_reg <= wdata[23:0];
-                    W_DUTY_REG: duty_reg    <= wdata[23:0];
-                    default: begin
-                        divider_reg <= 24'd1250000; 
-                        duty_reg    <= 24'd625000;  // 50% скважность
-                    end
-                endcase
-            end
         end
     end
 
@@ -223,25 +203,6 @@ module uart_axi_wrapper #(
             if (state == WAIT_CMD)      state_led[7]  <= 1'b1;
             if (state == SEND_DATA1)    state_led[8]  <= 1'b1;
             if (state == WAIT_DATA1)    state_led[9] <= 1'b1;
-        end
-    end
-    
-    logic [23:0] counter;
-
-   always @(posedge clk or negedge rst_n) begin 
-        if (!rst_n) begin
-            counter <= 0;
-            pwm_out <= 1'b0;
-        end else begin
-            if (divider_reg == 0) begin
-                pwm_out <= 1'b1;
-            end else begin
-                if (counter >= divider_reg)
-                    counter <= 0;
-                else
-                    counter <= counter + 1;
-                pwm_out <= (counter < duty_reg) ? 1'b1 : 1'b0;
-            end
         end
     end
 endmodule
