@@ -11,14 +11,8 @@ module top #(
     input  logic rst_n,
     input  logic rx,
     output logic tx,
-    output logic [9:0] state_led,
-    output logic [2:0] wstate_led,
-    //output logic [3:0] rx_valid_led,
-    //output logic [3:0] tx_done_led,
     output logic pwm_out
 );
-
-    //localparam CLKS_PER_BIT = CLK_FREQ_HZ / UART_BAUD; // 217
 
     // Parameters
     localparam ADDR_WIDTH = 32;
@@ -61,7 +55,6 @@ module top #(
         .o_TX_Done(tx_done)
     );
 
-    //assign tx_ready = ~tx_active;
 
     // AXI write master (wrapper)
     uart_axi_wrapper #(
@@ -74,7 +67,6 @@ module top #(
         .rx_byte(rx_byte),
         .tx_valid(tx_valid),
         .tx_byte(tx_byte),
-        //.tx_ready(tx_ready),
         .tx_done(tx_done),
         // AXI
         .awaddr(bus.AWADDR),
@@ -85,10 +77,7 @@ module top #(
         .wready(bus.WREADY),
         .wstrb(bus.WSTRB),
         .bvalid(bus.BVALID),
-        .bready(bus.BREADY),
-        .state_led(state_led)
-        //.rx_valid_led(rx_valid_led),
-        //.tx_done_led(tx_done_led)
+        .bready(bus.BREADY)
     );
 
     // PWM registers (AXI-Lite slave)
@@ -102,8 +91,7 @@ module top #(
         .rst_n(rst_n),
         .bus(bus),
         .divider_o(divider),
-        .duty_o(duty),
-        .wstate_led(wstate_led)
+        .duty_o(duty)
     );
 
     // PWM generator

@@ -21,8 +21,7 @@ module uart_axi_wrapper #(
     input  logic                  wready,
     output logic [DATA_WIDTH/8-1:0] wstrb,
     input  logic                  bvalid,
-    output logic                  bready,
-    output logic [9:0] state_led
+    output logic                  bready
 );
 
     typedef enum logic [4:0] {
@@ -30,17 +29,13 @@ module uart_axi_wrapper #(
         GOT_CMD,
         GOT_DATA1,
         GOT_DATA2,
-       // AXI_AW,
-       // AXI_W,
-       // AXI_B,
+        AXI_AW,
+        AXI_W,
+        AXI_B,
         SEND_CMD,
-        WAIT_CMD,
         SEND_DATA1,
-        WAIT_DATA1,
         SEND_DATA2,
-        WAIT_DATA2,
-        SEND_DATA3,
-        WAIT_DATA3
+        SEND_DATA3
     } state_t;
 
     state_t state;
@@ -68,14 +63,12 @@ module uart_axi_wrapper #(
             tx_valid <= 1'b0;
             tx_byte <= '0;
         end else begin
-            // Сброс импульсных сигналов по умолчанию
             awvalid <= 1'b0;
             wvalid  <= 1'b0;
             bready  <= 1'b0;
             tx_valid <= 1'b0;
 
             case (state)
-                // ---------- Приём 4 байт ----------
                 IDLE: begin
                     if (rx_valid) begin
                         `ifdef YOSYS
@@ -104,105 +97,71 @@ module uart_axi_wrapper #(
                 GOT_DATA2: begin
                     if (rx_valid) begin
                         data_3b_reg <= rx_byte;
-                        state <= SEND_CMD;
-                       // awvalid <= 1'b1;       // выставляем адрес
-                       // awaddr  <= write_addr;
-                        
+                        state <= AXI_AW;
+                        awvalid <= 1'b1;
+                        awaddr  <= write_addr;
                     end
                 end
 
-                // ---------- AXI-запись ----------
-          //      AXI_AW: begin
-          //          if (awready) begin
-          //              awvalid <= 1'b0;       // снимаем после подтверждения
-          //              state <= AXI_W;
-          //              wvalid <= 1'b1;
-          //              wdata  <= write_data;
-          //              wstrb  <= 4'b0111;
-          //          end
-          //      end
-
-          //      AXI_W: begin
-          //          if (wready) begin
-          //              wvalid <= 1'b0;
-          //              state <= AXI_B;
-          //              bready <= 1'b1;            // ждём ответ
-          //          end
-          //      end
-
-          //      AXI_B: begin
-          //          if (bvalid) begin
-          //              bready <= 1'b0;
-          //              state <= SEND_CMD;     // переходим к эхо
-          //          end
-          //      end
-
-                // ---------- Эхо: отправка 4 байт (SEND/WAIT) ----------
-                SEND_CMD: begin
-                    wvalid <= 1'b1;
-                    wdata  <= write_data;
-                    wstrb  <= 4'b1111;
-
-                    tx_valid <= 1'b1;
-                    tx_byte  <= cmd_reg;
-                    state <= WAIT_CMD;
+                // ---------- AXI-write ----------
+                AXI_AW: begin
+                    if (awready) begin
+                        awvalid <= 1'b0;
+                        state <= AXI_W;
+                        wvalid <= 1'b1;
+                        wdata  <= write_data;
+                        wstrb  <= 4'b0111;
+                    end
                 end
 
-                WAIT_CMD: begin
-                    if (tx_done) state <= SEND_DATA1;
+                AXI_W: begin
+                    if (wready) begin
+                        wvalid <= 1'b0;
+                        state <= AXI_B;
+                        bready <= 1'b1;
+                    end
+                end
+
+                AXI_B: begin
+                    if (bvalid) begin
+                        bready <= 1'b0;
+                        tx_valid <= 1'b1;
+                        tx_byte  <= cmd_reg;
+                        state <= SEND_CMD;
+                    end
+                end
+
+                // ---------- echo ----------
+                SEND_CMD: begin
+                    if (tx_done) begin 
+                        tx_valid <= 1'b1;
+                        tx_byte  <= data_1b_reg;
+                        state <= SEND_DATA1;
+                    end
                 end
 
                 SEND_DATA1: begin
-                    tx_valid <= 1'b1;
-                    tx_byte  <= data_1b_reg;
-                    state <= WAIT_DATA1;
-                end
-
-                WAIT_DATA1: begin
-                    if (tx_done) state <= SEND_DATA2;
+                    if (tx_done) begin
+                        tx_valid <= 1'b1;
+                        tx_byte  <= data_2b_reg;
+                        state <= SEND_DATA2;
+                    end
                 end
 
                 SEND_DATA2: begin
-                    tx_valid <= 1'b1;
-                    tx_byte  <= data_2b_reg;
-                    state <= WAIT_DATA2;
-                end
-
-                WAIT_DATA2: begin
-                    if (tx_done) state <= SEND_DATA3;
+                    if (tx_done) begin
+                        tx_valid <= 1'b1;
+                        tx_byte  <= data_3b_reg;
+                        state <= SEND_DATA3;
+                    end
                 end
 
                 SEND_DATA3: begin
-                    tx_valid <= 1'b1;
-                    tx_byte  <= data_3b_reg;
-                    state <= WAIT_DATA3;
-                end
-
-                WAIT_DATA3: begin
                     if (tx_done) state <= IDLE;
                 end
 
                 default: state <= IDLE;
             endcase
-        end
-    end
-
-    // Отладочные светодиоды
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            state_led <= '0;
-        end else begin
-            if (state == IDLE)          state_led[0]  <= 1'b1;
-            if (state == GOT_CMD)       state_led[1]  <= 1'b1;
-            if (state == GOT_DATA1)     state_led[2]  <= 1'b1;
-            if (state == GOT_DATA2)     state_led[3]  <= 1'b1;
-          //  if (state == AXI_AW)        state_led[4]  <= 1'b1;
-          //  if (state == AXI_W)         state_led[4]  <= 1'b1;
-          //  if (state == AXI_B)         state_led[5]  <= 1'b1;
-            if (state == SEND_CMD)      state_led[6]  <= 1'b1;
-            if (state == WAIT_CMD)      state_led[7]  <= 1'b1;
-            if (state == SEND_DATA1)    state_led[8]  <= 1'b1;
-            if (state == WAIT_DATA1)    state_led[9] <= 1'b1;
         end
     end
 endmodule
